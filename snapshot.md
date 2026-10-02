@@ -1,8 +1,8 @@
 # 项目快照: /home/Traversal/nixos-config
 
-**生成时间**: 2026-10-01 21:39:50
-**文件数**: 19
-**总大小**: 22.8 KB
+**生成时间**: 2026-10-02 13:59:07
+**文件数**: 21
+**总大小**: 28.1 KB
 
 ---
 
@@ -15,9 +15,11 @@
     ├── 📄 configuration.nix
   ├── 📁 home
     ├── 📄 terminal.nix
+    ├── 📄 gnome-extensions.nix
     ├── 📄 packages.nix
     ├── 📄 default.nix
     ├── 📄 shell.nix
+    ├── 📄 fcitx5.nix
     ├── 📄 scripts.nix
   ├── 📄 flake.lock
   ├── 📁 hosts
@@ -34,17 +36,19 @@
 
 ## 📄 文件列表
 
-1. `system/configuration.nix` (5.7 KB)
+1. `system/configuration.nix` (5.8 KB)
 2. `home/terminal.nix` (445 B)
-3. `home/packages.nix` (664 B)
-4. `home/default.nix` (2.6 KB)
-5. `home/shell.nix` (2.3 KB)
-6. `home/scripts.nix` (258 B)
-7. `flake.lock` (5.0 KB)
-8. `hosts/panasonic/hardware-configuration.nix` (1.1 KB)
-9. `hosts/lab/hardware-configuration.nix` (1.1 KB)
-10. `hosts/gpdmax2/hardware-configuration.nix` (1.0 KB)
-11. `flake.nix` (2.7 KB)
+3. `home/gnome-extensions.nix` (868 B)
+4. `home/packages.nix` (664 B)
+5. `home/default.nix` (2.5 KB)
+6. `home/shell.nix` (2.3 KB)
+7. `home/fcitx5.nix` (3.9 KB)
+8. `home/scripts.nix` (258 B)
+9. `flake.lock` (5.4 KB)
+10. `hosts/panasonic/hardware-configuration.nix` (1.1 KB)
+11. `hosts/lab/hardware-configuration.nix` (1.1 KB)
+12. `hosts/gpdmax2/hardware-configuration.nix` (1.0 KB)
+13. `flake.nix` (2.8 KB)
 
 ---
 
@@ -144,6 +148,7 @@
     };
   };
 
+
   # -- Audio --
   services.pipewire = {
     enable = true;
@@ -235,6 +240,7 @@
   # -- Packages --
   environment.systemPackages = with pkgs; [
     # Desktop / Daily
+    gnomeExtensions.kimpanel
     anydesk
     mihomo        # 内核 (来自 unstable overlay)
 
@@ -319,6 +325,41 @@
 
 ```
 
+### `home/gnome-extensions.nix`
+
+```nix
+{ config, pkgs, ... }:
+
+{
+  home.packages = with pkgs.gnomeExtensions; [
+    tiling-assistant    # 分屏增强（拖拽弹窗补位）
+    appindicator        # 系统托盘图标
+    caffeine            # 顶栏禁睡眠开关
+    blur-my-shell       # 毛玻璃
+    just-perfection     # UI 元素总开关
+    vitals              # 顶栏 CPU/内存/网速
+    clipboard-history   # 剪贴板历史
+  ];
+
+  # 扩展启用列表（含之前的 kimpanel）
+  dconf.settings = {
+    "org/gnome/shell" = {
+      "enabled-extensions" = [
+        "kimpanel@kde.org"
+        "tiling-assistant@leleat-on-github"
+        "appindicatorsupport@rgcjonas.gmail.com"
+        "caffeine@patapon.info"
+        "blur-my-shell@aunetx"
+        "just-perfection-desktop@just-perfection"
+        "Vitals@CoreCoding.com"
+        "clipboard-history@alexsaveau.dev"
+      ];
+    };
+  };
+}
+
+```
+
 ### `home/packages.nix`
 
 ```nix
@@ -385,6 +426,8 @@
     ./shell.nix
     ./terminal.nix
     ./scripts.nix
+    ./fcitx5.nix
+    ./gnome-extensions.nix
   ];
 
   home = {
@@ -396,8 +439,6 @@
   fonts.fontconfig.enable = false;
   programs.home-manager.enable = true;
 
-  # -- GNOME 电源管理：禁止自动熄屏/挂起/锁屏 --
-  # 用户级 dconf 设置，避免长时间 rebuild 被中断
   dconf.settings = {
     "org/gnome/desktop/session" = {
       "idle-delay" = 0;
@@ -564,6 +605,105 @@
 
 ```
 
+### `home/fcitx5.nix`
+
+```nix
+{ config, pkgs, rime-ice, ... }:
+
+let
+  # 雾凇拼音 + 自定义补丁（纯字面文本，无插值，缩进由 heredoc 原样保留）
+  # 翻页键: 移除 -/=，启用 ,/.（基于 rime-ice 默认 bindings 完整列表）
+  rimeIceWithCustom = pkgs.runCommand "rime-ice-with-custom" { } ''
+    mkdir -p $out
+    cp -r ${rime-ice}/. $out/
+    chmod u+w $out
+
+    cat > $out/default.custom.yaml <<'YAML'
+patch:
+  schema_list:
+    - schema: rime_ice
+  menu/page_size: 9
+  key_binder/bindings:
+    - { when: composing, accept: Shift+Tab, send: Shift+Left }
+    - { when: composing, accept: Tab, send: Shift+Right }
+    - { when: composing, accept: Alt+Left, send: Shift+Left }
+    - { when: composing, accept: Alt+Right, send: Shift+Right }
+    - { when: has_menu, accept: comma, send: Page_Up }
+    - { when: has_menu, accept: period, send: Page_Down }
+    - { when: always, toggle: ascii_punct, accept: Control+Shift+3 }
+    - { when: always, toggle: ascii_punct, accept: Control+Shift+numbersign }
+    - { when: always, toggle: traditionalization, accept: Control+Shift+4 }
+    - { when: always, toggle: traditionalization, accept: Control+Shift+dollar }
+    - { accept: KP_0, send: 0, when: composing }
+    - { accept: KP_1, send: 1, when: composing }
+    - { accept: KP_2, send: 2, when: composing }
+    - { accept: KP_3, send: 3, when: composing }
+    - { accept: KP_4, send: 4, when: composing }
+    - { accept: KP_5, send: 5, when: composing }
+    - { accept: KP_6, send: 6, when: composing }
+    - { accept: KP_7, send: 7, when: composing }
+    - { accept: KP_8, send: 8, when: composing }
+    - { accept: KP_9, send: 9, when: composing }
+    - { accept: KP_Decimal, send: period, when: composing }
+    - { accept: KP_Multiply, send: asterisk, when: composing }
+    - { accept: KP_Add, send: plus, when: composing }
+    - { accept: KP_Subtract, send: minus, when: composing }
+    - { accept: KP_Divide, send: slash, when: composing }
+    - { accept: KP_Enter, send: Return, when: composing }
+YAML
+
+    cat > $out/rime_ice.custom.yaml <<'YAML'
+patch:
+  key_binder/bindings:
+    - { when: composing, accept: Shift+Tab, send: Shift+Left }
+    - { when: composing, accept: Tab, send: Shift+Right }
+    - { when: composing, accept: Alt+Left, send: Shift+Left }
+    - { when: composing, accept: Alt+Right, send: Shift+Right }
+    - { when: has_menu, accept: comma, send: Page_Up }
+    - { when: has_menu, accept: period, send: Page_Down }
+    - { when: always, toggle: ascii_punct, accept: Control+Shift+3 }
+    - { when: always, toggle: ascii_punct, accept: Control+Shift+numbersign }
+    - { when: always, toggle: traditionalization, accept: Control+Shift+4 }
+    - { when: always, toggle: traditionalization, accept: Control+Shift+dollar }
+    - { accept: KP_0, send: 0, when: composing }
+    - { accept: KP_1, send: 1, when: composing }
+    - { accept: KP_2, send: 2, when: composing }
+    - { accept: KP_3, send: 3, when: composing }
+    - { accept: KP_4, send: 4, when: composing }
+    - { accept: KP_5, send: 5, when: composing }
+    - { accept: KP_6, send: 6, when: composing }
+    - { accept: KP_7, send: 7, when: composing }
+    - { accept: KP_8, send: 8, when: composing }
+    - { accept: KP_9, send: 9, when: composing }
+    - { accept: KP_Decimal, send: period, when: composing }
+    - { accept: KP_Multiply, send: asterisk, when: composing }
+    - { accept: KP_Add, send: plus, when: composing }
+    - { accept: KP_Subtract, send: minus, when: composing }
+    - { accept: KP_Divide, send: slash, when: composing }
+    - { accept: KP_Enter, send: Return, when: composing }
+YAML
+  '';
+in
+{
+  xdg.configFile."fcitx5/conf/classicui.conf".text = ''
+    Vertical Candidate List=False
+    PerScreenDPI=True
+    Font="Noto Sans CJK SC 16"
+    Theme=default
+  '';
+
+  xdg.configFile."fcitx5/conf/rime.conf".text = ''
+    PreeditInApplication=True
+  '';
+
+  home.file.".local/share/fcitx5/rime" = {
+    source = rimeIceWithCustom;
+    recursive = true;
+  };
+}
+
+```
+
 ### `home/scripts.nix`
 
 ```nix
@@ -660,8 +800,8 @@
     },
     "nixpkgs-unstable": {
       "locked": {
-        "lastModified": 1783776592,
-        "narHash": "sha256-UgCQzxeWI75XM8G+hPrPh+MKzEPjG3SpAj7dtqSbksA=",
+        "lastModified": 1790822859,
+        "narHash": "sha256-69xHQhAeMAD2wDXO7T2pcOZIF9Sga2W+JkmY2a11Ops=",
         "type": "tarball",
         "url": "https://ghfast.top/https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz"
       },
@@ -672,8 +812,8 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1783703440,
-        "narHash": "sha256-O3/YajjWo001VUIgD8BwaRdSNLUFe7nZ1qV5TwhRBcw=",
+        "lastModified": 1790750587,
+        "narHash": "sha256-VfjaoJ1Uyb7JZTrBgE5Jf2nhjtQPmD9KOd19HJwmZwM=",
         "type": "tarball",
         "url": "https://ghfast.top/https://github.com/NixOS/nixpkgs/archive/nixos-26.05.tar.gz"
       },
@@ -698,11 +838,28 @@
         "type": "github"
       }
     },
+    "rime-ice": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790337049,
+        "narHash": "sha256-qkRHk01UXrgherNi9eJPeKMyOE8yGkx4TF7oDxV+XYQ=",
+        "owner": "iDvel",
+        "repo": "rime-ice",
+        "rev": "3aea6d3694fb3d94ec663641f021f788822897ad",
+        "type": "github"
+      },
+      "original": {
+        "owner": "iDvel",
+        "repo": "rime-ice",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "home-manager": "home-manager",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "rime-ice": "rime-ice",
         "treesnap": "treesnap",
         "zen-browser": "zen-browser"
       }
@@ -899,9 +1056,13 @@
       url = "https://ghfast.top/https://github.com/YaomaRiff/treesnap/archive/nixos.tar.gz";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # 雾凇拼音词库（纯数据仓库，不是 flake）
+    rime-ice.url = "github:iDvel/rime-ice";
+    rime-ice.flake = false;
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, zen-browser, treesnap, ... }:
+  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, zen-browser, treesnap, rime-ice, ... }:
     let
       system = "x86_64-linux";
       
@@ -929,6 +1090,7 @@
           home-manager.extraSpecialArgs = {
             inherit zen-browser;
             inherit system;
+            inherit rime-ice;
           };
         }
       ];

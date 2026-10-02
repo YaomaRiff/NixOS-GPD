@@ -21,12 +21,25 @@
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, zen-browser, treesnap, rime-ice, ... }:
     let
       system = "x86_64-linux";
+
+      # 独立实例化 unstable 并允许 unfree（legacyPackages 不吃 NixOS 模块的 nixpkgs.config）
+      unstable = import nixpkgs-unstable {
+        inherit system;
+        config.allowUnfree = true;
+      };
       
       # 从 unstable 提取最新内核和 Web UI，覆盖稳定版
       overlay-unstable-tools = final: prev: {
-        mihomo = nixpkgs-unstable.legacyPackages.${system}.mihomo;
-        metacubexd = nixpkgs-unstable.legacyPackages.${system}.metacubexd;
-        zed-editor = nixpkgs-unstable.legacyPackages.${system}.zed-editor;
+        mihomo = unstable.mihomo;
+        metacubexd = unstable.metacubexd;
+        zed-editor = unstable.zed-editor;
+        # 微信官方 AppImage 版（stable 无此包），src 换成腾讯官方直链绕过 UOS 403
+        wechat = unstable.wechat.overrideAttrs (old: {
+          src = final.fetchurl {
+            url = "https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.AppImage";
+            hash = "sha256-T1StKQLs1vb9xWgLc1R/gNVCO/RwsBI3pXmi5bPK7us=";
+          };
+        });
       };
 
       commonModules = [

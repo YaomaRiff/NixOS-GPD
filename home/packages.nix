@@ -34,6 +34,7 @@
     btop
     yazi
     ueberzugpp
+    wl-clipboard
     ffmpegthumbnailer
     poppler-utils
     jq

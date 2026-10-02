@@ -183,6 +183,7 @@
     # Desktop / Daily
     gnomeExtensions.kimpanel
     anydesk
+    wechat        # 微信官方 Linux 客户端（AppImage 重打包）
     mihomo        # 内核 (来自 unstable overlay)
 
     # Archives
