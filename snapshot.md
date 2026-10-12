@@ -1,8 +1,8 @@
 # 项目快照: /home/Traversal/nixos-config
 
-**生成时间**: 2026-10-02 13:59:07
+**生成时间**: 2026-10-12 16:12:54
 **文件数**: 21
-**总大小**: 28.1 KB
+**总大小**: 28.7 KB
 
 ---
 
@@ -39,7 +39,7 @@
 1. `system/configuration.nix` (5.8 KB)
 2. `home/terminal.nix` (445 B)
 3. `home/gnome-extensions.nix` (868 B)
-4. `home/packages.nix` (664 B)
+4. `home/packages.nix` (681 B)
 5. `home/default.nix` (2.5 KB)
 6. `home/shell.nix` (2.3 KB)
 7. `home/fcitx5.nix` (3.9 KB)
@@ -48,7 +48,7 @@
 10. `hosts/panasonic/hardware-configuration.nix` (1.1 KB)
 11. `hosts/lab/hardware-configuration.nix` (1.1 KB)
 12. `hosts/gpdmax2/hardware-configuration.nix` (1.0 KB)
-13. `flake.nix` (2.8 KB)
+13. `flake.nix` (3.3 KB)
 
 ---
 
@@ -242,6 +242,7 @@
     # Desktop / Daily
     gnomeExtensions.kimpanel
     anydesk
+    wechat        # 微信官方 Linux 客户端（AppImage 重打包）
     mihomo        # 内核 (来自 unstable overlay)
 
     # Archives
@@ -399,6 +400,7 @@
     btop
     yazi
     ueberzugpp
+    wl-clipboard
     ffmpegthumbnailer
     poppler-utils
     jq
@@ -1065,12 +1067,25 @@ in
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, zen-browser, treesnap, rime-ice, ... }:
     let
       system = "x86_64-linux";
+
+      # 独立实例化 unstable 并允许 unfree（legacyPackages 不吃 NixOS 模块的 nixpkgs.config）
+      unstable = import nixpkgs-unstable {
+        inherit system;
+        config.allowUnfree = true;
+      };
       
       # 从 unstable 提取最新内核和 Web UI，覆盖稳定版
       overlay-unstable-tools = final: prev: {
-        mihomo = nixpkgs-unstable.legacyPackages.${system}.mihomo;
-        metacubexd = nixpkgs-unstable.legacyPackages.${system}.metacubexd;
-        zed-editor = nixpkgs-unstable.legacyPackages.${system}.zed-editor;
+        mihomo = unstable.mihomo;
+        metacubexd = unstable.metacubexd;
+        zed-editor = unstable.zed-editor;
+        # 微信官方 AppImage 版（stable 无此包），src 换成腾讯官方直链绕过 UOS 403
+        wechat = unstable.wechat.overrideAttrs (old: {
+          src = final.fetchurl {
+            url = "https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.AppImage";
+            hash = "sha256-T1StKQLs1vb9xWgLc1R/gNVCO/RwsBI3pXmi5bPK7us=";
+          };
+        });
       };
 
       commonModules = [

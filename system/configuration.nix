@@ -36,6 +36,15 @@
     };
   };
 
+  # -- Tailscale --
+  # 外网（热点）经 tailnet 回连 router：router 已在 tailnet（100.123.210.79）
+  # 并广播 192.168.100.0/24 子网路由，accept-routes 后可达整个内网
+  services.tailscale = {
+    enable = true;
+    openFirewall = true;
+    extraUpFlags = [ "--accept-routes" ];
+  };
+
   # -- Virtualization / Containers --
   programs.appimage = { enable = true; binfmt = true; };
   services.flatpak.enable = true;
@@ -234,6 +243,27 @@
     configFile = "/etc/mihomo/config.yaml";
     tunMode = false;
     webui = pkgs.metacubexd;
+  };
+
+  # 订阅热重载脚本（令牌与密钥均为 /etc/mihomo 下 600 的手动文件，不入 git）
+  environment.etc."mihomo/update-sub.sh" = {
+    mode = "0755";
+    text = ''
+      #!/bin/sh
+      set -e
+      url="$(cat /etc/mihomo/subscription.url)"
+      secret="$(cat /etc/mihomo/api-secret)"
+      tmp1="$(mktemp)"; tmp2="$(mktemp)"
+      trap 'rm -f "$tmp1" "$tmp2"' EXIT
+      curl --noproxy '*' -fsS -A "clash.meta" "$url" -o "$tmp1"
+      awk '/^proxies:/{f=1;print;next} /^[A-Za-z]/{f=0} f' "$tmp1" > "$tmp2"
+      [ -s "$tmp2" ] || { echo "提取为空，中止（令牌可能已失效）"; exit 1; }
+      install -o nobody -g nogroup -m 600 "$tmp2" /var/lib/private/mihomo/proxy_providers/my-airport.yaml
+      curl -s -X PUT -H "Authorization: Bearer $secret" "http://127.0.0.1:9090/providers/proxies/my-airport" && echo " <- 内核已热重载"
+      sleep 2
+      code="$(curl -x http://127.0.0.1:7890 -s -o /dev/null -w '%{http_code}' --max-time 10 https://www.google.com)"
+      echo "验收: $code"
+    '';
   };
 
   system.stateVersion = "26.05";
